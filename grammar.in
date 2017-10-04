@@ -1,0 +1,153 @@
+@members #
+    public static final int INF = 1_000_000_000;
+    public static int getArithmeticPriority(String op) {
+        int ans = 0;
+        switch(op) {
+            case "~":
+                ans++;
+            case "*":
+            case "/":
+            case "%":
+                ans++;
+            case "+":
+            case "-":
+                ans++;
+        }
+        return ans;
+    }
+    public static int getLogicalPriority(String op) {
+        int ans = 0;
+        switch(op) {
+            case "&&":
+            case "&":
+                ans++;
+            case "||":
+            case "|":
+                ans++;
+        }
+        return ans;
+    }
+    public static String getPrefix(int depth) {
+        StringBuilder prefix = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            prefix.append('\t');
+        }
+        return prefix.toString();
+    }
+#
+
+if_stat [int depth]
+    returns [String code]
+    locals [String else_brunch, String then_brunch]
+    @init { $else_brunch = ""; }
+    : IF bool_expr void_stat[depth+1]
+    { $then_brunch = $void_stat.code; }
+    void_stat[depth+1] { $else_brunch = String.format("else \n%s\n%s", $void_stat.code, getPrefix(depth)); }
+
+    { $code = String.format("%sif (%s) \n%s\n%s%s",
+     getPrefix(depth), $bool_expr.code, $then_brunch, getPrefix(depth), $else_brunch); };
+
+void_stat [int depth] returns [String code]
+    locals [String expr, List<String> voids]
+    @init {$voids = new ArrayList<>(); }
+    :
+    PRINT num_expr
+    {
+        $expr = $num_expr.code;
+        $code = String.format("%sSystem.out.println(%s);", getPrefix(depth), $expr);
+    }
+    |
+
+    if_stat[depth]
+    { $code = $if_stat.code; }
+
+    |
+
+    assign_stat[depth]
+    { $code = $assign_stat.code; }
+    ;
+
+assign_stat[int depth] returns [String code]:
+    EQUAL VAR expr = num_expr
+    {
+        $code = getPrefix(depth) + $VAR.text + " = " + $expr.code + ";";
+    }
+    ;
+
+bool_expr returns [String code, int priority]:
+    BOOLCONST
+    {
+        $code = $BOOLCONST.text;
+        $priority = INF;
+    }
+
+    | op = COMPOP left = num_expr right = num_expr
+    {
+        $code = String.format("%s %s %s", $left.code, $op.text, $right.code);
+        $priority = INF;
+    }
+
+    | op = BOOLOP leftB = bool_expr rightB = bool_expr
+    {
+        $priority = getLogicalPriority($op.text);
+        if ($leftB.priority < $priority)
+            $code = "(" + $leftB.code + ")";
+        else
+            $code = $leftB.code;
+
+        $code += " " + $op.text + " ";
+        if ($rightB.priority <= $priority)
+            $code += "(" + $rightB.code + ")";
+        else
+            $code += $rightB.code;
+
+    };
+
+num_expr returns [String code, int priority]:
+        op = ARITHMETICOP left = num_expr right = num_expr
+        {
+            $priority = getArithmeticPriority($op.text);
+            if ($left.priority < $priority)
+                $code = "(" + $left.code + ")";
+            else
+                $code = $left.code;
+            $code += " " + $op.text + " ";
+            if ($right.priority <= $priority)
+                $code += "(" + $right.code + ")";
+            else
+                $code += $right.code;
+        }
+
+        | NUM
+        {
+            $code = $NUM.text;
+            $priority = INF;
+        }
+
+        | VAR
+        {
+            $code = $VAR.text;
+            $priority = INF;
+        }
+
+        | UNARYOP expr = num_expr
+        {
+            $priority = getArithmeticPriority($UNARYOP.text);
+            if ($expr.priority < $priority)
+                $code = $UNARYOP.text + "(" + $expr.code + ")";
+            else
+                $code = $UNARYOP.text + $expr.code;
+        }
+        ;
+
+IF: "if";
+PRINT: "print";
+EQUAL: "=";
+BOOLCONST : "false|true";
+BOOLOP : "&&|\\|\\||&|\\|";
+ARITHMETICOP : "\\+|-|\\*|/|%";
+UNARYOP : "~";
+COMPOP: "<=|>=|==|<|>";
+
+NUM: "[1-9][0-9]*";
+VAR: "[a-zA-Z][a-zA-Z0-9]*";

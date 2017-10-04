@@ -1,0 +1,13 @@
+e:a e';
+e':|OR a e'|XOR a e';
+a:v a';
+a':|AND v a';
+v: VAR| NOT v | OB e CB;
+
+OR: "or";
+XOR: "xor";
+AND: "and";
+NOT: "not";
+OB: "\\(";
+CB: "\\)";
+VAR: "[a-z][a-zA-Z0-9]*";
